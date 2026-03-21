@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: bgd_postgres
+    environment:
+      POSTGRES_DB: bgd_flights
+      POSTGRES_USER: bgd
+      POSTGRES_PASSWORD: bgd_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./dataset:/data:ro        # CSV files available inside container at /data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bgd -d bgd_flights"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: bgd_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@bgd.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8080:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
