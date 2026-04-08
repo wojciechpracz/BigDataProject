@@ -1,0 +1,52 @@
+Goals,"Data modeling, management, processing, integration + cooperation & teamwork",,,,
+,,,,,
+,,,,,
+Date,Subject,Description,Team Size,Task Checked (Deliverables Required),Useful Links
+2026-03-07,Introduction & Data Exploration,Course overview and expectations. Big Data lifecycle introduction. Dataset exploration and problem definition. Discussion on database landscape and popularity trends.,1,• Review top 3 business and top 3 tech issues with data,"DB ranking: https://db-engines.com/en/ranking
+Kaggle datasets: https://www.kaggle.com/datasets
+UCI ML repository: https://archive.ics.uci.edu/
+EU Open Data: https://data.europa.eu/
+data.gov: https://catalog.data.gov/dataset
+Free real-time: https://github.com/bytewax/awesome-public-real-time-datasets "
+2026-03-21,ETL / ELT on Relational Database,Implementation of ETL/ELT using relational database (PostgreSQL or equivalent). Raw staging tables and transformed tables created via SQL.,1,"• Initial problem statement (analytical goal)
+• Database created
+• Raw table loaded
+• Cleaned table created
+• Gold layer with at least 1 JOIN or aggregation query
+• Reproducible SQL script
+• Identified 3 data quality risks","Sample datasets: https://www.postgresqltutorial.com/postgresql-sample-database/
+Mode SQL Tutorial: https://mode.com/sql-tutorial/
+DB Modelling: https://www.youtube.com/watch?v=LXK58eRNo9Q "
+2026-04-11,Scalable Processing (PySpark),Introduction to distributed processing and Bronze/Silver layers using Spark. Comparison between relational and distributed execution.,1,"• Bronze layer created
+• Silver transformation in PySpark
+• Runnable script/notebook
+• Short comparison: SQL vs Spark",Spark examples dataset: https://github.com/apache/spark/tree/master/examples/src/main/resources
+2026-04-25,Analytical Modeling (Gold Layer),Fact and dimension modeling. Grain definition and KPI-oriented modeling.,1,"• 1 Fact table
+• ≥2 Dimension tables
+• Grain defined in writing
+• 1 KPI query demonstrated
+• ER/architecture diagram",Kimball overview article: https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/
+2026-05-16,Data Sharing & AI Consumption,Data Product specification and cross-team data exchange. Simple ML/analytics model built on combined datasets.,1,"• Data Product Specification (schema, refresh, owner, access)
+• External dataset consumed
+• Simple ML model trained (regression/classification/etc.)
+• Output file or app","Streamlit cloud: https://streamlit.io/cloud
+Scikit-learn examples: https://scikit-learn.org/stable/auto_examples/index.html"
+2026-05-30,Data Governance (DMBoK Applied),Practical governance artifacts implemented within the project.,1,"• Architecture diagram
+• Data dictionary
+• ≥3 quality checks implemented
+• Owner/steward defined
+• Lifecycle documented","DAMA International: https://www.dama.org/
+Example data quality dimensions: https://www.iso.org/standard/35736.html"
+2026-06-13,Reliability & Failure Handling,Production-oriented thinking and failure scenarios.,1,"• Simulated failure scenario
+• Evidence of validation or safeguard logic
+• Idempotent pipeline behavior
+• Documented “What if” cases",Airflow example DAGs: https://airflow.apache.org/docs/apache-airflow/stable/tutorial/index.html
+2026-06-27,Final Project – End-to-End Data Product,Randomly assigned teams of 3 integrate their systems and present a complete data platform including external API ingestion.,3,"• Integrated workflow between 3 students
+• External API ingestion included
+• Live demo of full lifecycle
+• Governance & reliability summary
+• Reflection on architectural trade-offs","Open-Meteo API: https://open-meteo.com/
+World Bank API: https://data.worldbank.org/
+NBP API: https://api.nbp.pl/
+Alpha Vantage API: https://www.alphavantage.co/
+GitHub API: https://docs.github.com/en/rest"
