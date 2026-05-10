@@ -1,0 +1,333 @@
+# =============================================================
+# Data Product Contract
+# Product: US Domestic Flight Delays Analysis
+# =============================================================
+
+product:
+  name: "US Domestic Flight Delays Analysis"
+  version: "1.0"
+  status: "Production-like"
+  owner: "Wojciech Pracz"
+  contact: "MS Teams / BGD 2026 Course Channel"
+  business_domain: "Aviation / Transport Analytics"
+  primary_users:
+    - "BI analysts"
+    - "Transport researchers"
+    - "Data engineering students"
+  repository: "https://github.com/wojciechpracz/BigDataProject"
+  updated: "2026-05-10"
+
+# -------------------------------------------------------------
+purpose:
+  summary: >
+    Analyzing ~5.8 million US domestic flights from 2015 to identify which airlines
+    and airports generate the most delays and cancellations, and how delay patterns
+    vary by month and day of week. Removes all data engineering friction — consumers
+    query analytics-ready Gold tables directly via PostgreSQL after a single
+    docker compose up command.
+  business_questions:
+    - "Which airlines have the highest average arrival delay and worst on-time performance?"
+    - "Which origin airports are most associated with departure delays?"
+    - "Are delays seasonal — do certain months show systematically higher delays?"
+    - "Which days of the week have the worst delay patterns?"
+    - "What share of flights are cancelled per airline and per airport?"
+
+# -------------------------------------------------------------
+sources:
+  - name: "flights.csv"
+    type: "CSV file (Bureau of Transportation Statistics)"
+    description: "~5.8M US domestic flight records for 2015 including delay breakdown by cause and cancellation status"
+    key_fields: ["YEAR","MONTH","DAY","DAY_OF_WEEK","AIRLINE","ORIGIN_AIRPORT","DESTINATION_AIRPORT",
+                 "DEPARTURE_DELAY","ARRIVAL_DELAY","CANCELLED","CANCELLATION_REASON",
+                 "AIR_SYSTEM_DELAY","WEATHER_DELAY","AIRLINE_DELAY","LATE_AIRCRAFT_DELAY","SECURITY_DELAY"]
+    refresh: "Static — 2015 snapshot, loaded once"
+
+  - name: "airlines.csv"
+    type: "CSV file"
+    description: "IATA 2-letter code to airline name lookup (14 carriers)"
+    key_fields: ["IATA_CODE","AIRLINE"]
+    refresh: "Static"
+
+  - name: "airports.csv"
+    type: "CSV file"
+    description: "IATA 3-letter code to airport metadata (name, city, state, lat/lon)"
+    key_fields: ["IATA_CODE","AIRPORT","CITY","STATE","LATITUDE","LONGITUDE"]
+    refresh: "Static"
+
+# -------------------------------------------------------------
+access:
+  method: "Local Docker environment — PostgreSQL on localhost:5432"
+  steps:
+    - "git clone https://github.com/wojciechpracz/BigDataProject"
+    - "cd BigDataProject"
+    - "docker compose up -d"
+    - "python 01_baseline_sql_elt/scripts/run_all.py"
+    - "psql -h localhost -p 5432 -U postgres -d flights"
+  connection:
+    host: "localhost"
+    port: 5432
+    database: "flights"
+    user: "postgres"
+    password: "postgres"
+  credentials_note: "Default credentials set in docker-compose.yml — change before any public deployment"
+  spark_pipeline: >
+    Alternatively run the Spark + Kafka + Prefect pipeline:
+    python 02_orchestrated_spark_elt/prefect_flow.py
+    (Requires Java 17+ in PATH; results land in the same PostgreSQL instance)
+
+# -------------------------------------------------------------
+schema:
+  tables:
+
+    - table: "gold.airline_performance"
+      grain: "One row per airline (IATA code)"
+      description: "Per-airline KPI summary: delays, cancellations, on-time rate"
+      columns:
+        - name: "iata_code"
+          type: "TEXT"
+          pk: true
+          description: "Airline 2-letter IATA code"
+          example: "AA"
+        - name: "airline_name"
+          type: "TEXT"
+          description: "Full airline name"
+          example: "American Airlines"
+        - name: "total_flights"
+          type: "BIGINT"
+          description: "All scheduled flights including cancelled"
+          example: 725984
+        - name: "cancelled_flights"
+          type: "BIGINT"
+          description: "Number of cancelled flights"
+          example: 12340
+        - name: "cancellation_rate_pct"
+          type: "NUMERIC(5,2)"
+          description: "Percentage of flights cancelled"
+          example: 1.70
+        - name: "operated_flights"
+          type: "BIGINT"
+          description: "Non-cancelled (operated) flights"
+          example: 713644
+        - name: "avg_arrival_delay_min"
+          type: "NUMERIC(5,2)"
+          description: "Mean arrival delay in minutes (NULL delays and cancelled excluded)"
+          example: 7.45
+        - name: "avg_departure_delay_min"
+          type: "NUMERIC(5,2)"
+          description: "Mean departure delay in minutes (cancelled excluded)"
+          example: 9.12
+        - name: "on_time_rate_pct"
+          type: "NUMERIC(5,2)"
+          description: "Percentage of operated flights arriving with ≤0 min delay"
+          example: 74.30
+
+    - table: "gold.airport_delay_summary"
+      grain: "One row per origin airport (IATA code)"
+      description: "Per-origin-airport KPI summary: departure/arrival delays and cancellations"
+      columns:
+        - name: "iata_code"
+          type: "TEXT"
+          pk: true
+          description: "Origin airport 3-letter IATA code"
+          example: "ATL"
+        - name: "airport_name"
+          type: "TEXT"
+          description: "Full airport name"
+          example: "Hartsfield-Jackson Atlanta International Airport"
+        - name: "city"
+          type: "TEXT"
+          description: "City where the airport is located"
+          example: "Atlanta"
+        - name: "state"
+          type: "TEXT"
+          description: "US state abbreviation"
+          example: "GA"
+        - name: "total_departures"
+          type: "BIGINT"
+          description: "Total departure flights from this airport"
+          example: 460217
+        - name: "avg_departure_delay_min"
+          type: "NUMERIC(5,2)"
+          description: "Mean departure delay in minutes (cancelled excluded)"
+          example: 11.34
+        - name: "avg_arrival_delay_min"
+          type: "NUMERIC(5,2)"
+          description: "Mean arrival delay in minutes (cancelled excluded)"
+          example: 8.90
+        - name: "cancelled_flights"
+          type: "BIGINT"
+          description: "Number of cancelled flights from this airport"
+          example: 7812
+        - name: "cancellation_rate_pct"
+          type: "NUMERIC(5,2)"
+          description: "Percentage of flights cancelled from this airport"
+          example: 1.70
+
+    - table: "gold.delay_by_month_weekday"
+      grain: "One row per (month, day_of_week) combination — 84 rows total (12 × 7)"
+      description: "Heatmap-ready aggregation of delays by calendar month and day of week"
+      columns:
+        - name: "month"
+          type: "INTEGER"
+          description: "Month number (1 = January … 12 = December)"
+          example: 7
+        - name: "day_of_week"
+          type: "INTEGER"
+          description: "Day of week (1 = Monday … 7 = Sunday)"
+          example: 5
+        - name: "day_name"
+          type: "TEXT"
+          description: "Day of week name"
+          example: "Friday"
+        - name: "total_flights"
+          type: "BIGINT"
+          description: "Number of flights in this month/weekday bucket"
+          example: 82340
+        - name: "avg_arrival_delay_min"
+          type: "NUMERIC(5,2)"
+          description: "Mean arrival delay in minutes for this bucket (cancelled excluded)"
+          example: 12.80
+        - name: "avg_departure_delay_min"
+          type: "NUMERIC(5,2)"
+          description: "Mean departure delay in minutes for this bucket (cancelled excluded)"
+          example: 14.20
+        - name: "cancellation_rate_pct"
+          type: "NUMERIC(5,2)"
+          description: "Percentage of cancelled flights in this bucket"
+          example: 1.90
+
+# -------------------------------------------------------------
+refresh:
+  frequency: "On-demand per pipeline run"
+  trigger: "Manual — python 01_baseline_sql_elt/scripts/run_all.py"
+  strategy: "Full overwrite (DROP + CREATE) — idempotent, no incremental updates"
+  duration_estimate: "~2-5 minutes for SQL pipeline on standard laptop; ~10-15 min for Spark pipeline"
+  note: "No scheduler configured in the baseline pipeline. Spark pipeline via Prefect can be scheduled."
+
+# -------------------------------------------------------------
+quality_metrics:
+  validated_at: "End of every pipeline run"
+  metrics:
+
+    - name: "Row Count — cleaned.flights"
+      definition: "Total number of rows loaded into cleaned.flights after type casting, deduplication and IATA-code validation"
+      sql: |
+        SELECT COUNT(*) AS row_count FROM cleaned.flights;
+      current_value: "~5,700,000"
+      threshold: "> 5,000,000"
+      cadence: "Every pipeline run"
+
+    - name: "Completeness of flight_date"
+      definition: "Percentage of rows in cleaned.flights where flight_date (computed from YEAR/MONTH/DAY) is NOT NULL"
+      sql: |
+        SELECT
+          ROUND(100.0 * COUNT(*) FILTER (WHERE flight_date IS NOT NULL) / COUNT(*), 2)
+            AS flight_date_completeness_pct
+        FROM cleaned.flights;
+      current_value: "~100%"
+      threshold: "> 99.9%"
+      cadence: "Every pipeline run"
+
+    - name: "Uniqueness of iata_code in gold.airline_performance"
+      definition: "Percentage of unique iata_code values in gold.airline_performance — must be 100% (one row per airline)"
+      sql: |
+        SELECT
+          ROUND(100.0 * COUNT(DISTINCT iata_code) / COUNT(*), 2)
+            AS iata_uniqueness_pct
+        FROM gold.airline_performance;
+      current_value: "100%"
+      threshold: "100%"
+      cadence: "Every pipeline run"
+
+    - name: "IATA Code Validity Rejection Rate"
+      definition: "Percentage of raw.flights rows rejected because ORIGIN_AIRPORT or DESTINATION_AIRPORT is not a valid 3-letter IATA code (numeric codes, empty strings, etc.)"
+      sql: |
+        SELECT
+          ROUND(
+            100.0 * (
+              SELECT COUNT(*) FROM raw.flights
+              WHERE origin_airport !~ '^[A-Z]{3}$' OR destination_airport !~ '^[A-Z]{3}$'
+            ) / (SELECT COUNT(*) FROM raw.flights), 2
+          ) AS rejection_rate_pct;
+      current_value: "< 0.5%"
+      threshold: "< 1%"
+      cadence: "Every pipeline run"
+
+    - name: "Completeness of departure_delay (non-cancelled flights)"
+      definition: "Percentage of non-cancelled rows in cleaned.flights where departure_delay is NOT NULL"
+      sql: |
+        SELECT
+          ROUND(
+            100.0 * COUNT(*) FILTER (WHERE departure_delay IS NOT NULL)
+                  / COUNT(*), 2
+          ) AS departure_delay_completeness_pct
+        FROM cleaned.flights
+        WHERE NOT cancelled;
+      current_value: "> 99%"
+      threshold: "> 99%"
+      cadence: "Every pipeline run"
+
+# -------------------------------------------------------------
+known_limitations:
+  - id: 1
+    description: "Numeric airport codes excluded — some major hubs appear with 5-digit numeric codes (e.g. 10397) instead of IATA codes in the raw data. These rows are intentionally filtered out in the cleaned layer, slightly reducing coverage."
+  - id: 2
+    description: "2015 data only — the dataset is a static historical snapshot. No real-time or multi-year data is available in this product."
+  - id: 3
+    description: "Full overwrite on each run — no incremental updates or historical run tracking. Re-running the pipeline completely replaces all Gold tables."
+  - id: 4
+    description: "Delay cause breakdown not aggregated — the raw data contains five delay-cause columns (air_system, weather, airline, late_aircraft, security) but these are not surfaced in the current Gold tables."
+  - id: 5
+    description: "Java 17+ required for Spark pipeline — the Orchestrated Spark pipeline (02_orchestrated_spark_elt/) will fail if Java is not available in PATH."
+  - id: 6
+    description: "No route-level analysis — the Gold layer aggregates per-airline and per-airport. Origin-destination pair analysis is not implemented."
+
+# -------------------------------------------------------------
+example_usage:
+  tool: "psql or any PostgreSQL-compatible client (DBeaver, DataGrip, Python/psycopg2)"
+  connection_string: "postgresql://postgres:postgres@localhost:5432/flights"
+
+  examples:
+    - title: "Top 10 airlines by average arrival delay"
+      sql: |
+        SELECT
+          airline_name,
+          avg_arrival_delay_min,
+          on_time_rate_pct,
+          cancellation_rate_pct
+        FROM gold.airline_performance
+        ORDER BY avg_arrival_delay_min DESC
+        LIMIT 10;
+
+    - title: "Top 20 worst origin airports for departure delays"
+      sql: |
+        SELECT
+          airport_name,
+          city,
+          state,
+          avg_departure_delay_min,
+          total_departures
+        FROM gold.airport_delay_summary
+        ORDER BY avg_departure_delay_min DESC
+        LIMIT 20;
+
+    - title: "Monthly average arrival delay heatmap data"
+      sql: |
+        SELECT
+          month,
+          day_name,
+          avg_arrival_delay_min,
+          cancellation_rate_pct
+        FROM gold.delay_by_month_weekday
+        ORDER BY month, day_of_week;
+
+    - title: "Python — load airline performance into pandas"
+      python: |
+        import pandas as pd
+        import sqlalchemy
+
+        engine = sqlalchemy.create_engine(
+            "postgresql://postgres:postgres@localhost:5432/flights"
+        )
+        df = pd.read_sql("SELECT * FROM gold.airline_performance ORDER BY avg_arrival_delay_min DESC", engine)
+        print(df.head())
