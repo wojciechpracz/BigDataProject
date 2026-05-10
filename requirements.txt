@@ -3,3 +3,4 @@ prefect==2.19.9
 pydantic==2.10.6
 minio==7.2.7
 psycopg[binary]==3.2.13
+kafka-python==2.0.2
